@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700;900&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Space Grotesk", sans-serif;
+
+  --color-surface: var(--surface);
+  --color-on-surface: var(--on-surface);
+  --color-primary: var(--primary);
+  --color-background: var(--background);
+
+  --color-gb-bg: var(--gb-bg);
+  --color-gb-moss: var(--gb-moss);
+  --color-gb-jungle: var(--gb-jungle);
+  --color-gb-pale-lime: var(--gb-pale-lime);
+  --color-gb-lcd: var(--gb-lcd);
+  --color-gb-lcd-dark: var(--gb-lcd-dark);
+}
+
+/* LIGHT MODE */
+:root {
+  -background: #3ce6b6;
+  --surface: #0f7783;
+  --on-surface: #0f380f;
+  --primary: #306230;
+
+  --gb-bg: #1d5b49;
+  --gb-moss: #0e4e51;
+  --gb-jungle: #0d6988;
+  --gb-pale-lime: #d26c6c;
+  --gb-lcd: #0f99bc;
+  --gb-lcd-dark: #053545;
+}
+
+/* DARK MODE */
+.dark {
+  --background: #05151d;
+  --surface: #081820;
+  --on-surface: #d4e5f0;
+  --primary: #9edba8;
+
+  --gb-bg: #05151d;
+  --gb-moss: #23483d;
+  --gb-jungle: #0e351f;
+  --gb-pale-lime: #d4e5f0;
+  --gb-lcd: #6fa866;
+  --gb-lcd-dark: #071407;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    margin: 0;
+  }
+
+  body {
+    @apply bg-background text-on-surface overflow-x-hidden;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .dot-matrix {
+    background-image: radial-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+    background-size: 4px 4px;
+  }
+
+  .pixel-border-heavy {
+    box-shadow:
+      0 4px 0 0 var(--gb-lcd-dark),
+      4px 0 0 0 var(--gb-lcd-dark),
+      0 -4px 0 0 var(--gb-lcd-dark),
+      -4px 0 0 0 var(--gb-lcd-dark);
+  }
+
+  .pixel-shadow {
+    box-shadow: 4px 4px 0 0 var(--gb-lcd-dark);
+  }
+
+  .pixel-shadow-lg {
+    box-shadow: 8px 8px 0 0 var(--gb-lcd-dark);
+  }
+
+  .retro-btn-pressed {
+    @apply transition-all active:translate-y-1 active:shadow-none;
+  }
+}
