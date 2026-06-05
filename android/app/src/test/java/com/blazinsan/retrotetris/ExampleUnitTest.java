@@ -1,4 +1,4 @@
-package com.getcapacitor.myapp;
+package com.blazinsan.retrotetris;
 
 import static org.junit.Assert.*;
 
