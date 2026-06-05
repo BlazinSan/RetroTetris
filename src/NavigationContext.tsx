@@ -11,7 +11,15 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export const NavigationProvider = ({ children }: { children: ReactNode }) => {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('game');
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('score')) {
+        return 'share';
+      }
+    } catch {}
+    return 'game';
+  });
   const [direction, setDirection] = useState(0);
   const [transitionType, setTransitionType] = useState<TransitionType>('none');
 

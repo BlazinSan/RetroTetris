@@ -84,17 +84,53 @@ export const ShareScreen = () => {
     setTimeout(() => setToast(null), 2500);
   };
 
+  const sharedRun = useMemo((): SavedRun | null => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const scoreStr = params.get('score');
+      if (scoreStr) {
+        return {
+          id: params.get('id') || 'SHARED',
+          score: Number(scoreStr) || 0,
+          lines: Number(params.get('lines')) || 0,
+          level: Number(params.get('level')) || 0,
+          rank: params.get('rank') || 'D',
+          duration: params.get('duration') || '00:00',
+          date: params.get('date') || new Date().toLocaleDateString('en-GB').toUpperCase(),
+          playerName: params.get('player') || 'RETRO_USER_01',
+        };
+      }
+    } catch (e) {
+      console.error('Failed to parse shared run:', e);
+    }
+    return null;
+  }, []);
+
   const bestRun = useMemo(() => {
+    if (sharedRun) return sharedRun;
     if (history.length === 0) return null;
     return [...history].sort((a, b) => b.score - a.score)[0];
-  }, [history]);
+  }, [sharedRun, history]);
+
+  const scoreUrl = useMemo(() => {
+    if (!bestRun) return 'https://8bitretrotetris.vercel.app/';
+    const params = new URLSearchParams({
+      score: String(bestRun.score),
+      lines: String(bestRun.lines),
+      level: String(bestRun.level),
+      duration: bestRun.duration,
+      rank: bestRun.rank,
+      player: bestRun.playerName || 'RETRO_USER_01',
+      id: String(bestRun.id || '')
+    });
+    return `https://8bitretrotetris.vercel.app/?${params.toString()}`;
+  }, [bestRun]);
 
   const gameId = useMemo(() => makeGameId(bestRun), [bestRun]);
 
   // Generate QR Code on canvas with Tetris green colors
   useEffect(() => {
     if (qrCanvasRef.current && gameId) {
-      const scoreUrl = `https://8bitretrotetris.vercel.app/score/${gameId}`;
       QRCode.toCanvas(
         qrCanvasRef.current,
         scoreUrl,
@@ -111,7 +147,7 @@ export const ShareScreen = () => {
         }
       );
     }
-  }, [gameId]);
+  }, [gameId, scoreUrl]);
 
   const copyGameId = async () => {
     try {
@@ -126,7 +162,6 @@ export const ShareScreen = () => {
   const handleCopyCode = async () => {
     try {
       if (settings.haptic) navigator.vibrate?.(20);
-      const scoreUrl = `https://8bitretrotetris.vercel.app/score/${gameId}`;
       await navigator.clipboard.writeText(scoreUrl);
       showToast('SCORE LINK COPIED!');
     } catch {
@@ -135,7 +170,7 @@ export const ShareScreen = () => {
   };
 
   const shareText = bestRun
-    ? `I scored ${bestRun.score.toLocaleString()} in Retro Tetris! Rank ${bestRun.rank}, ${bestRun.lines} lines, level ${bestRun.level}. Game ID: ${gameId}`
+    ? `I scored ${bestRun.score.toLocaleString()} in Retro Tetris! Rank ${bestRun.rank}, ${bestRun.lines} lines, level ${bestRun.level}. View scorecard: ${scoreUrl}`
     : 'No Retro Tetris score saved yet.';
 
   const shareScore = async () => {
