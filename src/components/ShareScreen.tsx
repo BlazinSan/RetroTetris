@@ -94,7 +94,7 @@ export const ShareScreen = () => {
   // Generate QR Code on canvas with Tetris green colors
   useEffect(() => {
     if (qrCanvasRef.current && gameId) {
-      const scoreUrl = `${window.location.origin}/score/${gameId}`;
+      const scoreUrl = `https://8bitretrotetris.vercel.app/score/${gameId}`;
       QRCode.toCanvas(
         qrCanvasRef.current,
         scoreUrl,
@@ -126,7 +126,7 @@ export const ShareScreen = () => {
   const handleCopyCode = async () => {
     try {
       if (settings.haptic) navigator.vibrate?.(20);
-      const scoreUrl = `${window.location.origin}/score/${gameId}`;
+      const scoreUrl = `https://8bitretrotetris.vercel.app/score/${gameId}`;
       await navigator.clipboard.writeText(scoreUrl);
       showToast('SCORE LINK COPIED!');
     } catch {
