@@ -89,15 +89,28 @@ export const ShareScreen = () => {
       const params = new URLSearchParams(window.location.search);
       const scoreStr = params.get('score');
       if (scoreStr) {
+        const rawPlayer = params.get('player') || 'RETRO_USER_01';
+        const sanitizedPlayer = rawPlayer.replace(/[^a-zA-Z0-9_\-\s]/g, '').trim().substring(0, 15).toUpperCase() || 'RETRO_USER';
+
+        const rawRank = params.get('rank') || 'D';
+        const sanitizedRank = ['S', 'A', 'B', 'C', 'D'].includes(rawRank.toUpperCase()) ? rawRank.toUpperCase() : 'D';
+
+        const rawDuration = params.get('duration') || '00:00';
+        const sanitizedDuration = /^\d{2,3}:\d{2}$/.test(rawDuration) ? rawDuration : '00:00';
+
+        const scoreVal = Math.min(Math.max(0, Number(scoreStr) || 0), 9999999);
+        const linesVal = Math.min(Math.max(0, Number(params.get('lines')) || 0), 999);
+        const levelVal = Math.min(Math.max(0, Number(params.get('level')) || 0), 99);
+
         return {
-          id: params.get('id') || 'SHARED',
-          score: Number(scoreStr) || 0,
-          lines: Number(params.get('lines')) || 0,
-          level: Number(params.get('level')) || 0,
-          rank: params.get('rank') || 'D',
-          duration: params.get('duration') || '00:00',
-          date: params.get('date') || new Date().toLocaleDateString('en-GB').toUpperCase(),
-          playerName: params.get('player') || 'RETRO_USER_01',
+          id: 'SHARED',
+          score: scoreVal,
+          lines: linesVal,
+          level: levelVal,
+          rank: sanitizedRank,
+          duration: sanitizedDuration,
+          date: new Date().toLocaleDateString('en-GB').toUpperCase(),
+          playerName: sanitizedPlayer,
         };
       }
     } catch (e) {
