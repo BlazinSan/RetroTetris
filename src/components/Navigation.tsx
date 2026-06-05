@@ -60,7 +60,9 @@ export const Sidebar = () => {
         href="#"
         className={`flex flex-col items-center justify-center p-2 hover:bg-gb-lcd active:scale-95 transition-all w-full ${currentScreen === 'game' ? 'bg-gb-lcd-dark text-gb-pale-lime' : 'text-gb-jungle dark:text-gb-pale-lime/70'}`}
       >
-      <Gamepad2 size={22} strokeWidth={3} />      </a>
+        <Gamepad2 size={22} strokeWidth={3} />
+        <span>PLAY</span>
+      </a>
       <a 
         onClick={(e) => { e.preventDefault(); navigate('history', 'none'); }} 
         href="#"

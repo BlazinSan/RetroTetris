@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { saveGameResult } from '../../storage';
+import { useSettings } from '../../SettingsContext';
 
 const COLS = 10;
 const ROWS = 20;
@@ -14,6 +15,7 @@ const SHAPES = {
 };
 
 export function useTetris(startLevel: number = 1) {
+  const { settings } = useSettings();
   const [grid, setGrid] = useState<number[][]>(() => Array.from({ length: ROWS }, () => Array(COLS).fill(0)));
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(startLevel);
@@ -43,8 +45,15 @@ export function useTetris(startLevel: number = 1) {
     const [m, o] = [piece.matrix, piece.pos];
     for (let y = 0; y < m.length; ++y) {
       for (let x = 0; x < m[y].length; ++x) {
-        if (m[y][x] !== 0 && (currentGrid[y + o.y] && currentGrid[y + o.y][x + o.x]) !== 0) {
-          return true;
+        if (m[y][x] !== 0) {
+          const gridY = y + o.y;
+          const gridX = x + o.x;
+          if (gridX < 0 || gridX >= COLS || gridY >= ROWS) {
+            return true;
+          }
+          if (gridY >= 0 && currentGrid[gridY][gridX] !== 0) {
+            return true;
+          }
         }
       }
     }
@@ -216,8 +225,9 @@ export function useTetris(startLevel: number = 1) {
       lines,
       level,
       durationSeconds: Math.floor((Date.now() - startedAt.current) / 1000),
+      playerName: settings.playerName,
     });
-  }, [gameOver, score, lines, level]);
+  }, [gameOver, score, lines, level, settings.playerName]);
 
   return {
     grid, activePiece, nextPiece, score, level, lines, gameOver, isPaused,

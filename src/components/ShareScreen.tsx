@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   ArrowLeft,
   Copy,
@@ -13,6 +13,12 @@ import {
   Users,
 } from 'lucide-react';
 import { useNavigation } from '../NavigationContext';
+import { useSettings } from '../SettingsContext';
+import { Share as CapShare } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import * as htmlToImage from 'html-to-image';
+import QRCode from 'qrcode';
 
 type SavedRun = {
   id?: string | number;
@@ -61,11 +67,22 @@ function makeGameId(run: SavedRun | null) {
 
 export const ShareScreen = () => {
   const { navigate } = useNavigation();
+  const { settings } = useSettings();
   const [history, setHistory] = useState<SavedRun[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const scoreboardRef = useRef<HTMLDivElement>(null);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     setHistory(readHistory());
   }, []);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    if (settings.haptic) navigator.vibrate?.(20);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   const bestRun = useMemo(() => {
     if (history.length === 0) return null;
@@ -74,11 +91,46 @@ export const ShareScreen = () => {
 
   const gameId = useMemo(() => makeGameId(bestRun), [bestRun]);
 
+  // Generate QR Code on canvas with Tetris green colors
+  useEffect(() => {
+    if (qrCanvasRef.current && gameId) {
+      const scoreUrl = `${window.location.origin}/score/${gameId}`;
+      QRCode.toCanvas(
+        qrCanvasRef.current,
+        scoreUrl,
+        {
+          width: 80,
+          margin: 1,
+          color: {
+            dark: '#071407',  // Tetris Dark Green
+            light: '#6fa866', // Tetris Light Green
+          },
+        },
+        (error) => {
+          if (error) console.error('QR Code generation failed:', error);
+        }
+      );
+    }
+  }, [gameId]);
+
   const copyGameId = async () => {
     try {
+      if (settings.haptic) navigator.vibrate?.(20);
       await navigator.clipboard.writeText(gameId);
+      showToast('GAME ID COPIED!');
     } catch {
-      // Ignore copy errors silently for now.
+      showToast('COPY FAILED!');
+    }
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      if (settings.haptic) navigator.vibrate?.(20);
+      const scoreUrl = `${window.location.origin}/score/${gameId}`;
+      await navigator.clipboard.writeText(scoreUrl);
+      showToast('SCORE LINK COPIED!');
+    } catch {
+      showToast('COPY FAILED!');
     }
   };
 
@@ -88,16 +140,97 @@ export const ShareScreen = () => {
 
   const shareScore = async () => {
     try {
-      if (navigator.share) {
+      if (settings.haptic) navigator.vibrate?.(20);
+
+      if (Capacitor.isNativePlatform()) {
+        await CapShare.share({
+          title: 'Retro Tetris Score',
+          text: shareText,
+          dialogTitle: 'Share Retro Tetris Score'
+        });
+      } else if (navigator.share) {
         await navigator.share({
           title: 'Retro Tetris Score',
           text: shareText,
         });
       } else {
         await navigator.clipboard.writeText(shareText);
+        showToast('COPIED TO CLIPBOARD!');
       }
     } catch {
-      // Ignore share errors silently for now.
+      try {
+        await navigator.clipboard.writeText(shareText);
+        showToast('COPIED TO CLIPBOARD!');
+      } catch {
+        showToast('SHARE FAILED!');
+      }
+    }
+  };
+
+  const handleExportImage = async () => {
+    if (settings.haptic) navigator.vibrate?.(30);
+    if (!scoreboardRef.current) {
+      showToast('CARD NOT FOUND!');
+      return;
+    }
+
+    try {
+      // Use html-to-image to capture the card
+      const dataUrl = await htmlToImage.toPng(scoreboardRef.current, {
+        cacheBust: true,
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left',
+        }
+      });
+
+      const fileName = `retrotetris-score-${bestRun?.score || 0}.png`;
+
+      // Check if we are running in Capacitor (native Android/iOS)
+      if (Capacitor.isNativePlatform()) {
+        const base64Data = dataUrl.split(',')[1]; // Get only the base64 part
+        
+        try {
+          // Write the file to the documents directory
+          await Filesystem.writeFile({
+            path: fileName,
+            data: base64Data,
+            directory: Directory.Documents,
+          });
+          showToast('SAVED TO DOCUMENTS!');
+        } catch (fileErr) {
+          try {
+            // Write the file to Cache directory as fallback and share it
+            await Filesystem.writeFile({
+              path: fileName,
+              data: base64Data,
+              directory: Directory.Cache,
+            });
+            const uriResult = await Filesystem.getUri({
+              path: fileName,
+              directory: Directory.Cache
+            });
+            await CapShare.share({
+              title: 'Retro Tetris Scorecard',
+              files: [uriResult.uri],
+            });
+            showToast('SHARED SCORECARD!');
+          } catch (shareErr) {
+            console.error('File write/share failed:', shareErr);
+            showToast('SAVE FAILED!');
+          }
+        }
+      } else {
+        // Browser download fallback
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        link.click();
+        showToast('IMAGE EXPORTED!');
+      }
+    } catch (err) {
+      console.error('Export image failed:', err);
+      showToast('EXPORT FAILED!');
     }
   };
 
@@ -139,10 +272,23 @@ export const ShareScreen = () => {
               </p>
             </div>
 
-            <div className="w-full bg-gb-lcd border-4 border-gb-lcd-dark p-4 shadow-pixel-shadow flex flex-col gap-4 relative">
+            <div
+              ref={scoreboardRef}
+              id="scoreboard-card"
+              className="w-full bg-gb-lcd border-4 border-gb-lcd-dark p-4 shadow-pixel-shadow flex flex-col gap-4 relative"
+            >
+              <div className="flex justify-between items-center border-b-2 border-gb-lcd-dark pb-2 gap-2">
+                <span className="text-[10px] font-bold text-gb-lcd-dark/70 uppercase">
+                  Player:
+                </span>
+                <span className="font-headline font-black text-gb-lcd-dark uppercase tracking-wider truncate">
+                  {bestRun?.playerName || 'RETRO_USER_01'}
+                </span>
+              </div>
+
               <div className="flex justify-between items-end border-b-2 border-gb-lcd-dark pb-2 gap-4">
                 <span className="text-[10px] font-bold text-gb-lcd-dark/70 uppercase">
-                  Player Score:
+                  Score:
                 </span>
                 <span className="text-4xl font-black text-gb-lcd-dark">
                   {bestRun ? bestRun.score.toLocaleString() : '0'}
@@ -159,9 +305,15 @@ export const ShareScreen = () => {
                   </span>
                 </div>
 
-                <div className="h-20 w-20 bg-gb-lcd-dark flex items-center justify-center p-2">
-                  <Trophy size={48} strokeWidth={3} className="text-gb-pale-lime" />
-                </div>
+                {bestRun ? (
+                  <div className="h-20 w-20 bg-[#6fa866] border-2 border-[#071407] flex items-center justify-center p-[2px] shadow-pixel-shadow">
+                    <canvas ref={qrCanvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+                  </div>
+                ) : (
+                  <div className="h-20 w-20 bg-gb-lcd-dark flex items-center justify-center p-2">
+                    <Trophy size={48} strokeWidth={3} className="text-gb-pale-lime" />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-gb-lcd-dark text-center">
@@ -211,11 +363,17 @@ export const ShareScreen = () => {
               </button>
 
               <div className="grid grid-cols-2 gap-4">
-                <ActionButton icon={<Download size={22} strokeWidth={3} />} label="Export Image" />
-                <ActionButton icon={<QrCode size={22} strokeWidth={3} />} label="Copy Code" onClick={copyGameId} />
+                <ActionButton icon={<Download size={22} strokeWidth={3} />} label="Export Image" onClick={handleExportImage} />
+                <ActionButton icon={<QrCode size={22} strokeWidth={3} />} label="Copy Code" onClick={handleCopyCode} />
               </div>
             </div>
           </div>
+
+          {toast && (
+            <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-gb-lcd-dark text-gb-pale-lime font-black px-6 py-3 border-4 border-gb-lcd shadow-pixel-shadow z-50 text-xs animate-bounce uppercase">
+              {toast}
+            </div>
+          )}
 
           <div className="flex justify-between mt-6 px-4">
             <div className="relative w-16 h-16 bg-gb-lcd-dark/20 rounded-full flex items-center justify-center">

@@ -8,6 +8,7 @@ export interface GameResult {
   durationSeconds: number;
   rank: 'S' | 'A' | 'B' | 'C' | 'D';
   name: string;
+  playerName?: string;
 }
 
 const HISTORY_KEY = 'tetris-history';
@@ -47,12 +48,24 @@ export const saveGameResult = ({
   lines,
   level,
   durationSeconds,
+  playerName,
 }: {
   score: number;
   lines: number;
   level: number;
   durationSeconds: number;
+  playerName?: string;
 }) => {
+  const finalPlayerName = playerName || (() => {
+    try {
+      const saved = localStorage.getItem('tetris-settings');
+      if (saved) {
+        return JSON.parse(saved).playerName || 'RETRO_USER_01';
+      }
+    } catch {}
+    return 'RETRO_USER_01';
+  })();
+
   const result: GameResult = {
     id: Date.now(),
     date: new Date().toLocaleDateString('en-GB', {
@@ -66,7 +79,8 @@ export const saveGameResult = ({
     duration: formatDuration(durationSeconds),
     durationSeconds,
     rank: getRankBadge(score),
-    name: PLAYER_NAME,
+    name: finalPlayerName,
+    playerName: finalPlayerName,
   };
 
   const history = [result, ...getHistory()].slice(0, 50);

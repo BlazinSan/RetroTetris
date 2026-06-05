@@ -106,51 +106,168 @@ export const GameScreen = () => {
     nextPiece,
     score,
     level,
+    lines,
     gameOver,
     isPaused,
     move,
     rotate,
     drop,
+    hardDrop,
     togglePause,
     reset,
     collide,
   } = useTetris(settings.level);
 
   const { navigate } = useNavigation();
+  const prevLinesRef = React.useRef(lines);
+  const [isShaking, setIsShaking] = React.useState(false);
 
+  // Screen shake and line-clear haptics
+  useEffect(() => {
+    if (lines > prevLinesRef.current) {
+      if (settings.screenShake) {
+        setIsShaking(true);
+        const timer = setTimeout(() => setIsShaking(false), 350);
+        prevLinesRef.current = lines;
+        if (settings.haptic) {
+          navigator.vibrate?.([60, 40, 60]);
+        }
+        return () => clearTimeout(timer);
+      }
+    }
+    prevLinesRef.current = lines;
+  }, [lines, settings.screenShake, settings.haptic]);
+
+  // Game over haptic alert
+  useEffect(() => {
+    if (gameOver && settings.haptic) {
+      navigator.vibrate?.([100, 50, 100, 50, 150]);
+    }
+  }, [gameOver, settings.haptic]);
+
+  // Synchronize master music volume
   useEffect(() => {
     if (musicGain) {
       musicGain.gain.value = (settings.volume / 100) * 0.025;
     }
+  }, [settings.volume]);
 
-    if (!settings.music || settings.volume <= 0) {
+  // Manage background music playback based on settings, pause state, and game over state
+  useEffect(() => {
+    if (settings.music && settings.volume > 0 && !isPaused && !gameOver) {
+      startMusic(settings.volume);
+    } else {
       stopMusic();
     }
-  }, [settings.music, settings.volume]);
+    return () => {
+      stopMusic();
+    };
+  }, [settings.music, settings.volume, isPaused, gameOver]);
 
   const playSfx = useCallback(
     async (frequency = 440, duration = 0.06) => {
       await getAudioContext();
 
-      if (settings.music) {
-        startMusic(settings.volume);
-      } else {
-        stopMusic();
-      }
-
       if (!settings.sfx || settings.volume <= 0) return;
 
       playTone(frequency, duration, (settings.volume / 100) * 0.06);
     },
-    [settings.sfx, settings.music, settings.volume]
+    [settings.sfx, settings.volume]
   );
 
+  // Keyboard controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (gameOver || isPaused) {
+        if (e.key === 'Enter') {
+          if (gameOver) {
+            if (settings.haptic) navigator.vibrate?.(20);
+            playSfx(180);
+            reset();
+          } else if (isPaused) {
+            if (settings.haptic) navigator.vibrate?.(20);
+            playSfx(620);
+            togglePause();
+          }
+          e.preventDefault();
+        }
+        return;
+      }
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (settings.haptic) navigator.vibrate?.(8);
+          playSfx(330);
+          move(-1);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (settings.haptic) navigator.vibrate?.(8);
+          playSfx(330);
+          move(1);
+          break;
+        case 'ArrowUp':
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          if (settings.haptic) navigator.vibrate?.(15);
+          playSfx(520);
+          rotate(1);
+          break;
+        case 'b':
+        case 'B':
+          e.preventDefault();
+          if (settings.haptic) navigator.vibrate?.(15);
+          playSfx(390);
+          rotate(-1);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          if (settings.haptic) navigator.vibrate?.(10);
+          playSfx(260);
+          drop();
+          break;
+        case ' ': // Space key for Hard Drop
+          if (settings.hardDrop) {
+            e.preventDefault();
+            if (settings.haptic) navigator.vibrate?.(30);
+            playSfx(260);
+            hardDrop();
+          }
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (settings.haptic) navigator.vibrate?.(20);
+          playSfx(620);
+          togglePause();
+          break;
+        case 'r':
+        case 'R':
+          e.preventDefault();
+          if (settings.haptic) navigator.vibrate?.(20);
+          playSfx(180);
+          reset();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [gameOver, isPaused, move, rotate, drop, hardDrop, togglePause, reset, playSfx, settings.hardDrop]);
+
   const handleRotateA = () => {
+    if (settings.haptic) navigator.vibrate?.(15);
     playSfx(520);
     rotate(1);
   };
 
   const handleRotateB = () => {
+    if (settings.haptic) navigator.vibrate?.(15);
     playSfx(390);
     rotate(-1);
   };
@@ -239,7 +356,7 @@ export const GameScreen = () => {
 
   return (
     <div className="flex flex-col items-center justify-center p-4 pb-20 w-full min-h-[calc(100vh-4rem)] overflow-y-auto">
-      <div className="relative bg-[#2c3e50] p-8 rounded-b-[40px] rounded-t-lg border-[6px] border-gb-lcd-dark shadow-pixel-shadow-lg w-full max-w-md origin-top">
+      <div className={`relative bg-[#2c3e50] p-8 rounded-b-[40px] rounded-t-lg border-[6px] border-gb-lcd-dark shadow-pixel-shadow-lg w-full max-w-md origin-top ${isShaking ? 'animate-shake' : ''}`}>
         <div className="bg-gb-moss p-6 rounded-lg mb-8 border-b-8 border-r-8 border-gb-lcd-dark">
           <div className="flex justify-between items-center mb-2 px-2">
             <div className="flex gap-1">
@@ -314,10 +431,10 @@ export const GameScreen = () => {
               <div className="w-4 h-4 rounded-full border border-gb-moss/20" />
             </div>
 
-            <button aria-label="Up" onClick={() => { playSfx(520); rotate(1); }} className="absolute top-0 w-10 h-10 active:scale-95 transition-transform" />
-            <button aria-label="Down" onClick={() => { playSfx(260); drop(); }} className="absolute bottom-0 w-10 h-10 active:scale-95 transition-transform" />
-            <button aria-label="Left" onClick={() => { playSfx(330); move(-1); }} className="absolute left-0 w-10 h-10 active:scale-95 transition-transform" />
-            <button aria-label="Right" onClick={() => { playSfx(330); move(1); }} className="absolute right-0 w-10 h-10 active:scale-95 transition-transform" />
+            <button aria-label="Up" onClick={() => { if (settings.haptic) navigator.vibrate?.(15); playSfx(520); rotate(1); }} className="absolute top-0 w-10 h-10 active:scale-95 transition-transform" />
+            <button aria-label="Down" onClick={() => { if (settings.haptic) navigator.vibrate?.(10); playSfx(260); drop(); }} className="absolute bottom-0 w-10 h-10 active:scale-95 transition-transform" />
+            <button aria-label="Left" onClick={() => { if (settings.haptic) navigator.vibrate?.(8); playSfx(330); move(-1); }} className="absolute left-0 w-10 h-10 active:scale-95 transition-transform" />
+            <button aria-label="Right" onClick={() => { if (settings.haptic) navigator.vibrate?.(8); playSfx(330); move(1); }} className="absolute right-0 w-10 h-10 active:scale-95 transition-transform" />
           </div>
 
           <div className="flex flex-col items-end gap-8 translate-x-8 rotate-[-10deg]">

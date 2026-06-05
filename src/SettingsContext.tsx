@@ -11,6 +11,8 @@ interface Settings {
   invertButtons: boolean;
   volume: number;
   level: number;
+  playerName: string;
+  syncId: string;
 }
 
 const initialSettings: Settings = {
@@ -23,13 +25,16 @@ const initialSettings: Settings = {
   darkMode: true,
   invertButtons: false,
   volume: 80,
-  level: 5
+  level: 5,
+  playerName: 'RETRO_USER_01',
+  syncId: ''
 };
 
 interface SettingsContextType {
   settings: Settings;
   updateSetting: (name: keyof Settings, value: any) => void;
   resetSettings: () => void;
+  setSettings: React.Dispatch<React.SetStateAction<Settings>>; // Expose setSettings for batch updates on sync/import
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -37,7 +42,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [settings, setSettings] = useState<Settings>(() => {
     const saved = localStorage.getItem('tetris-settings');
-    return saved ? JSON.parse(saved) : initialSettings;
+    return saved ? { ...initialSettings, ...JSON.parse(saved) } : initialSettings;
   });
 
   useEffect(() => {
@@ -49,8 +54,43 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [settings]);
 
+  const updateHistoryPlayerName = (newName: string) => {
+    try {
+      const historyRaw = localStorage.getItem('tetris-history');
+      if (historyRaw) {
+        const history = JSON.parse(historyRaw);
+        if (Array.isArray(history)) {
+          const updated = history.map((run: any) => ({
+            ...run,
+            name: newName,
+            playerName: newName
+          }));
+          localStorage.setItem('tetris-history', JSON.stringify(updated));
+        }
+      }
+
+      const leaderboardRaw = localStorage.getItem('tetris-leaderboard');
+      if (leaderboardRaw) {
+        const leaderboard = JSON.parse(leaderboardRaw);
+        if (Array.isArray(leaderboard)) {
+          const updated = leaderboard.map((run: any) => ({
+            ...run,
+            name: newName,
+            playerName: newName
+          }));
+          localStorage.setItem('tetris-leaderboard', JSON.stringify(updated));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const updateSetting = (name: keyof Settings, value: any) => {
     setSettings(prev => ({ ...prev, [name]: value }));
+    if (name === 'playerName') {
+      updateHistoryPlayerName(value);
+    }
   };
 
   const resetSettings = () => {
@@ -58,7 +98,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSetting, resetSettings }}>
+    <SettingsContext.Provider value={{ settings, updateSetting, resetSettings, setSettings }}>
       {children}
     </SettingsContext.Provider>
   );

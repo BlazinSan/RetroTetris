@@ -9,11 +9,61 @@ import {
   Volume2,
   Vibrate,
   Settings2,
+  Users,
+  Cloud,
 } from 'lucide-react';
+import { uploadSyncData, updateSyncData, downloadSyncData } from '../sync';
 
 export const ConfigScreen = () => {
   const { navigate } = useNavigation();
-  const { settings, updateSetting, resetSettings } = useSettings();
+  const { settings, updateSetting, resetSettings, setSettings } = useSettings();
+  const [inputSyncId, setInputSyncId] = React.useState('');
+  const [syncStatus, setSyncStatus] = React.useState<string | null>(null);
+
+  const handleUploadBackup = async () => {
+    setSyncStatus('BACKING UP...');
+    try {
+      const history = JSON.parse(localStorage.getItem('tetris-history') || '[]');
+      const data = { history, settings };
+      if (settings.syncId) {
+        await updateSyncData(settings.syncId, data);
+        setSyncStatus('BACKUP UPDATED!');
+      } else {
+        const newId = await uploadSyncData(data);
+        updateSetting('syncId', newId);
+        setSyncStatus('BACKUP CREATED!');
+      }
+    } catch (err) {
+      setSyncStatus('BACKUP FAILED!');
+    }
+    setTimeout(() => setSyncStatus(null), 3000);
+  };
+
+  const handleImportBackup = async () => {
+    if (!inputSyncId.trim()) {
+      setSyncStatus('ENTER SYNC ID!');
+      setTimeout(() => setSyncStatus(null), 3000);
+      return;
+    }
+    setSyncStatus('IMPORTING...');
+    try {
+      const data = await downloadSyncData(inputSyncId.trim());
+      if (data) {
+        if (data.history) {
+          localStorage.setItem('tetris-history', JSON.stringify(data.history));
+        }
+        if (data.settings) {
+          setSettings({ ...settings, ...data.settings, syncId: inputSyncId.trim() });
+        }
+        setSyncStatus('IMPORT SUCCESSFUL!');
+      } else {
+        setSyncStatus('IMPORT FAILED!');
+      }
+    } catch (err) {
+      setSyncStatus('IMPORT ERROR!');
+    }
+    setTimeout(() => setSyncStatus(null), 3000);
+  };
 
   const handleToggle = (name: string) => {
     updateSetting(name as any, !settings[name as keyof typeof settings]);
@@ -76,6 +126,79 @@ export const ConfigScreen = () => {
                 <Toggle label="HAPTIC FEEDBACK" checked={settings.haptic} onChange={() => handleToggle('haptic')} />
                 <Toggle label="DARK MODE" checked={settings.darkMode} onChange={() => handleToggle('darkMode')} />
                 <Toggle label="INVERT A & B BUTTONS" checked={settings.invertButtons} onChange={() => handleToggle('invertButtons')} />
+              </ConfigSection>
+
+              <ConfigSection icon={<Users size={22} strokeWidth={3} />} title="PROFILE">
+                <div className="flex flex-col gap-1.5">
+                  <span className="font-black text-[10px] uppercase">PLAYER NAME</span>
+                  <input
+                    type="text"
+                    maxLength={14}
+                    value={settings.playerName}
+                    onChange={(e) => updateSetting('playerName', e.target.value.toUpperCase())}
+                    className="w-full bg-gb-pale-lime text-gb-lcd-dark border-2 border-gb-lcd-dark font-black px-2.5 py-1.5 uppercase placeholder-gb-lcd-dark/40 focus:outline-none text-xs"
+                    placeholder="PLAYER NAME"
+                  />
+                </div>
+              </ConfigSection>
+
+              <ConfigSection icon={<Cloud size={22} strokeWidth={3} />} title="ONLINE SYNC">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="font-black text-[10px] uppercase text-gb-lcd-dark/70">CLOUD SYNC ID</span>
+                    {settings.syncId ? (
+                      <div className="bg-gb-pale-lime text-gb-lcd-dark border-2 border-gb-lcd-dark font-black px-2.5 py-1.5 break-all text-xs flex justify-between items-center gap-2">
+                        <span className="select-all">{settings.syncId}</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(settings.syncId);
+                            setSyncStatus('ID COPIED!');
+                            setTimeout(() => setSyncStatus(null), 2000);
+                          }}
+                          className="text-gb-lcd-dark hover:scale-95 active:scale-90 font-black uppercase text-[9px] border border-gb-lcd-dark px-1 py-0.5"
+                        >
+                          COPY
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] font-bold italic text-gb-lcd-dark/50">NO BACKUP SYNCED YET</span>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUploadBackup}
+                      className="flex-1 bg-gb-lcd-dark text-gb-pale-lime font-black py-2 text-[10px] border-2 border-gb-lcd-dark shadow-pixel-shadow active:translate-y-0.5 active:shadow-none uppercase"
+                    >
+                      {settings.syncId ? 'Update Backup' : 'Create Backup'}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 border-t border-dashed border-gb-lcd-dark/30 pt-2.5">
+                    <span className="font-black text-[10px] uppercase text-gb-lcd-dark/70">IMPORT FROM SYNC ID</span>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={inputSyncId}
+                        onChange={(e) => setInputSyncId(e.target.value)}
+                        className="flex-1 bg-gb-pale-lime text-gb-lcd-dark border-2 border-gb-lcd-dark font-black px-2.5 py-1.5 text-xs placeholder-gb-lcd-dark/40 focus:outline-none"
+                        placeholder="PASTE SYNC ID"
+                      />
+                      <button
+                        onClick={handleImportBackup}
+                        className="bg-gb-jungle text-gb-pale-lime font-black px-3 py-1.5 border-2 border-gb-lcd-dark text-[10px] shadow-pixel-shadow active:translate-y-0.5 active:shadow-none uppercase"
+                      >
+                        Import
+                      </button>
+                    </div>
+                  </div>
+
+                  {syncStatus && (
+                    <div className="bg-gb-lcd-dark text-gb-pale-lime font-black text-center py-1.5 text-[10px] animate-pulse border border-gb-lcd-dark uppercase">
+                      {syncStatus}
+                    </div>
+                  )}
+                </div>
               </ConfigSection>
             </div>
           </div>
