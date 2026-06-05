@@ -229,9 +229,13 @@ export function useTetris(startLevel: number = 1) {
     });
   }, [gameOver, score, lines, level, settings.playerName]);
 
+  const togglePause = useCallback(() => {
+    setIsPaused(p => !p);
+  }, []);
+
   return {
     grid, activePiece, nextPiece, score, level, lines, gameOver, isPaused,
-    move, rotate, drop, hardDrop, togglePause: () => setIsPaused(p => !p), reset,
+    move, rotate, drop, hardDrop, togglePause, reset,
     collide
   };
 }

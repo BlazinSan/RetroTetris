@@ -153,16 +153,40 @@ export const GameScreen = () => {
   }, [settings.volume]);
 
   // Manage background music playback based on settings, pause state, and game over state
+  // Also handle backgrounding (visibility change) to pause game and audio context
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (!isPaused && !gameOver) {
+          togglePause();
+        }
+        if (audioCtx && audioCtx.state === 'running') {
+          audioCtx.suspend();
+        }
+        stopMusic();
+      } else if (document.visibilityState === 'visible') {
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        if (settings.music && settings.volume > 0 && !isPaused && !gameOver) {
+          startMusic(settings.volume);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     if (settings.music && settings.volume > 0 && !isPaused && !gameOver) {
       startMusic(settings.volume);
     } else {
       stopMusic();
     }
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       stopMusic();
     };
-  }, [settings.music, settings.volume, isPaused, gameOver]);
+  }, [settings.music, settings.volume, isPaused, gameOver, togglePause]);
 
   const playSfx = useCallback(
     async (frequency = 440, duration = 0.06) => {
