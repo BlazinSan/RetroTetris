@@ -177,8 +177,31 @@ export const ShareScreen = () => {
       if (settings.haptic) navigator.vibrate?.(20);
       await navigator.clipboard.writeText(scoreUrl);
       showToast('SCORE LINK COPIED!');
-    } catch {
-      showToast('COPY FAILED!');
+    } catch (err) {
+      console.error('Clipboard copy failed:', err);
+    }
+
+    try {
+      const shareDataText = bestRun
+        ? `I scored ${bestRun.score.toLocaleString()} in Retro Tetris! Rank ${bestRun.rank}, ${bestRun.lines} lines, level ${bestRun.level}.`
+        : 'Retro Tetris Scorecard';
+
+      if (Capacitor.isNativePlatform()) {
+        await CapShare.share({
+          title: 'Retro Tetris Score',
+          text: shareDataText,
+          url: scoreUrl,
+          dialogTitle: 'Share Retro Tetris Score'
+        });
+      } else if (navigator.share) {
+        await navigator.share({
+          title: 'Retro Tetris Score',
+          text: shareDataText,
+          url: scoreUrl,
+        });
+      }
+    } catch (err) {
+      console.error('Sharing failed:', err);
     }
   };
 
